@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日常記帳本｜個人收支管理</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 頂部導覽列 -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">帳</div>
+        <div>
+          <h1>日常記帳本</h1>
+          <p class="subtitle">簡單好用的個人收支與預算管理</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="month-switcher" role="group" aria-label="月份切換">
+          <button type="button" id="prevMonthBtn" class="icon-btn" title="上個月" aria-label="上個月">‹</button>
+          <button type="button" id="currentPeriodBtn" class="period-label" title="點擊回到本月">2026年 11月</button>
+          <button type="button" id="nextMonthBtn" class="icon-btn" title="下個月" aria-label="下個月">›</button>
+        </div>
+        <button type="button" id="toggleAllPeriodBtn" class="btn btn-ghost" aria-pressed="false">顯示全部期間</button>
+        <div class="divider-v" aria-hidden="true"></div>
+        <button type="button" id="exportCsvBtn" class="btn btn-outline">匯出 CSV</button>
+        <button type="button" id="backupBtn" class="btn btn-outline">備份 / 還原</button>
+        <button type="button" id="themeToggleBtn" class="icon-btn" title="切換深色/淺色模式" aria-label="切換深色或淺色模式">◐</button>
+      </div>
+    </header>
+
+    <!-- 統計摘要卡片 -->
+    <section class="summary-grid" aria-label="收支總覽">
+      <article class="card stat-card stat-balance">
+        <div class="stat-header">
+          <span class="stat-label" id="balancePeriodLabel">本月結餘</span>
+          <span class="badge" id="savingRateBadge">儲蓄率 --</span>
+        </div>
+        <div class="stat-value" id="netBalanceValue">NT$ 0</div>
+        <p class="stat-hint" id="transactionCountHint">共 0 筆紀錄</p>
+      </article>
+
+      <article class="card stat-card stat-income">
+        <div class="stat-header">
+          <span class="stat-label">總收入</span>
+          <span class="dot dot-income" aria-hidden="true"></span>
+        </div>
+        <div class="stat-value positive" id="totalIncomeValue">NT$ 0</div>
+        <p class="stat-hint" id="incomeCountHint">0 筆收入</p>
+      </article>
+
+      <article class="card stat-card stat-expense">
+        <div class="stat-header">
+          <span class="stat-label">總支出</span>
+          <span class="dot dot-expense" aria-hidden="true"></span>
+        </div>
+        <div class="stat-value negative" id="totalExpenseValue">NT$ 0</div>
+        <p class="stat-hint" id="expenseCountHint">0 筆支出</p>
+      </article>
+
+      <article class="card stat-card stat-budget">
+        <div class="stat-header">
+          <span class="stat-label">本月支出預算</span>
+          <button type="button" id="editBudgetBtn" class="text-link">設定預算</button>
+        </div>
+        <div class="budget-numbers">
+          <strong id="budgetRemainingValue">尚未設定</strong>
+          <span id="budgetTargetText" class="muted"></span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="budgetProgressBar">
+          <div class="progress-fill" id="budgetProgressFill"></div>
+        </div>
+        <p class="stat-hint" id="budgetHint">設定每月支出上限，掌握花費節奏</p>
+      </article>
+    </section>
+
+    <!-- 主工作區：左欄記帳表單 + 右欄圖表與明細 -->
+    <main class="workspace">
+      <!-- 新增 / 編輯記帳表單 -->
+      <aside class="card entry-panel" aria-label="新增記帳">
+        <div class="panel-header">
+          <h2 id="formTitle">新增紀錄</h2>
+          <button type="button" id="cancelEditBtn" class="text-link hidden">取消編輯</button>
+        </div>
+
+        <form id="entryForm" novalidate>
+          <input type="hidden" id="editingId" value="" />
+
+          <!-- 收支類型切換 -->
+          <div class="type-toggle" role="radiogroup" aria-label="交易類型">
+            <button type="button" class="type-btn active" data-type="expense" aria-checked="true">支出</button>
+            <button type="button" class="type-btn" data-type="income" aria-checked="false">收入</button>
+          </div>
+
+          <!-- 金額 -->
+          <div class="form-group">
+            <label for="amountInput">金額 (NT$)</label>
+            <div class="amount-input-wrap">
+              <span class="currency-prefix">NT$</span>
+              <input
+                type="number"
+                id="amountInput"
+                name="amount"
+                inputmode="decimal"
+                min="1"
+                step="1"
+                placeholder="0"
+                required
+              />
+            </div>
+            <div class="quick-amounts" aria-label="常用金額快速填入">
+              <button type="button" class="chip-btn" data-add="100">+100</button>
+              <button type="button" class="chip-btn" data-add="500">+500</button>
+              <button type="button" class="chip-btn" data-add="1000">+1,000</button>
+              <button type="button" class="chip-btn" data-clear-amount="true">歸零</button>
+            </div>
+          </div>
+
+          <!-- 分類選擇 -->
+          <div class="form-group">
+            <label>分類</label>
+            <div id="categoryGrid" class="category-grid" role="radiogroup" aria-label="交易分類"></div>
+          </div>
+
+          <!-- 日期與付款方式 -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="dateInput">日期</label>
+              <input type="date" id="dateInput" name="date" required />
+            </div>
+            <div class="form-group">
+              <label for="paymentSelect">帳戶 / 方式</label>
+              <select id="paymentSelect" name="payment">
+                <option value="現金">現金</option>
+                <option value="信用卡">信用卡</option>
+                <option value="電子支付">電子支付</option>
+                <option value="銀行轉帳">銀行轉帳</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 備註 -->
+          <div class="form-group">
+            <label for="noteInput">備註說明</label>
+            <input
+              type="text"
+              id="noteInput"
+              name="note"
+              maxlength="60"
+              placeholder="例如：午餐便當、捷運儲值、十月薪資..."
+            />
+          </div>
+
+          <p id="formError" class="form-error hidden" role="alert"></p>
+
+          <button type="submit" id="submitEntryBtn" class="btn btn-primary btn-block">加入記帳本</button>
+        </form>
+
+        <div class="quick-tools">
+          <button type="button" id="loadSampleBtn" class="text-link">載入範例資料</button>
+          <button type="button" id="clearAllBtn" class="text-link danger-link">清空所有資料</button>
+        </div>
+      </aside>
+
+      <!-- 右側：圖表與交易明細 -->
+      <section class="content-column">
+        <!-- 圖表區 -->
+        <div class="charts-grid">
+          <article class="card chart-card">
+            <div class="panel-header">
+              <h2 id="donutTitle">支出分類佔比</h2>
+              <div class="mini-tabs" role="tablist" aria-label="圓餅圖類型">
+                <button type="button" class="mini-tab active" data-chart-type="expense">支出</button>
+                <button type="button" class="mini-tab" data-chart-type="income">收入</button>
+              </div>
+            </div>
+            <div class="donut-layout">
+              <div class="donut-wrap" id="donutContainer"></div>
+              <ul class="category-legend" id="categoryLegend"></ul>
+            </div>
+          </article>
+
+          <article class="card chart-card">
+            <div class="panel-header">
+              <h2 id="trendTitle">每日收支趨勢</h2>
+              <div class="trend-legend">
+                <span><i class="legend-dot income"></i>收入</span>
+                <span><i class="legend-dot expense"></i>支出</span>
+              </div>
+            </div>
+            <div class="trend-wrap" id="trendContainer"></div>
+          </article>
+        </div>
+
+        <!-- 交易明細區 -->
+        <section class="card ledger-card" aria-label="交易明細">
+          <div class="ledger-header">
+            <h2>交易明細</h2>
+            <div class="filter-bar">
+              <input
+                type="search"
+                id="searchInput"
+                class="search-input"
+                placeholder="搜尋備註或分類..."
+                aria-label="搜尋交易紀錄"
+              />
+              <select id="filterTypeSelect" aria-label="依類型篩選">
+                <option value="all">全部類型</option>
+                <option value="expense">僅支出</option>
+                <option value="income">僅收入</option>
+              </select>
+              <select id="filterCategorySelect" aria-label="依分類篩選">
+                <option value="all">全部分類</option>
+              </select>
+              <select id="filterPaymentSelect" aria-label="依付款方式篩選">
+                <option value="all">全部方式</option>
+                <option value="現金">現金</option>
+                <option value="信用卡">信用卡</option>
+                <option value="電子支付">電子支付</option>
+                <option value="銀行轉帳">銀行轉帳</option>
+              </select>
+              <select id="sortSelect" aria-label="排序方式">
+                <option value="date-desc">最新日期優先</option>
+                <option value="date-asc">最早日期優先</option>
+                <option value="amount-desc">金額由高到低</option>
+                <option value="amount-asc">金額由低到高</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="transactionList" class="transaction-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <!-- 設定預算對話框 -->
+  <dialog id="budgetDialog" class="modal">
+    <form method="dialog" class="modal-card" id="budgetForm">
+      <h3>設定每月支出預算</h3>
+      <p class="muted">設定後會自動計算該月剩餘額度，並於接近或超支時提醒您。</p>
+      <div class="form-group">
+        <label for="budgetInput">每月預算金額 (NT$)</label>
+        <input type="number" id="budgetInput" min="0" step="100" placeholder="例如：25000（輸入 0 表示清除預算）" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="closeBudgetDialog">取消</button>
+        <button type="submit" class="btn btn-primary">儲存預算</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 備份 / 還原對話框 -->
+  <dialog id="backupDialog" class="modal">
+    <div class="modal-card">
+      <h3>資料備份與還原 (JSON)</h3>
+      <p class="muted">您的記帳資料目前保存在此瀏覽器的本機儲存空間 (localStorage)。您可以匯出備份檔，或從 JSON 檔案還原。</p>
+      <div class="backup-actions">
+        <button type="button" id="exportJsonBtn" class="btn btn-primary">下載 JSON 備份檔</button>
+        <label class="btn btn-outline file-upload-btn">
+          選擇 JSON 檔案匯入
+          <input type="file" id="importJsonInput" accept=".json,application/json" hidden />
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="closeBackupDialog">關閉</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 提示訊息 Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span id="toastMessage"></span>
+    <button type="button" id="toastUndoBtn" class="toast-undo hidden">復原</button>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
